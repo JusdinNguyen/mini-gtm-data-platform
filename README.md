@@ -177,7 +177,7 @@ npm run dev       # Start dev server
 
 Then open http://localhost:3000 to view dashboards.
 
-**Note**: Evidence connects to the DuckDB warehouse at `../warehouse/data.duckdb` and queries the `marts` schema through pass-through SQL files in `evidence/sources/warehouse/`.
+**Note**: Evidence connects to the DuckDB warehouse at `../warehouse/data.duckdb` and queries the `marts` and `staging` schemas through pass-through SQL files in `evidence/sources/warehouse/`.
 
 ### Building Evidence (Static Site)
 
