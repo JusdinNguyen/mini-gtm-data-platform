@@ -1,17 +1,14 @@
 # Mini Data Platform — GTM Edition
 
-This repo is a synthetic data platform containing mock GTM data — CRM records, sales call intelligence, marketing automation, and product analytics — along with Airflow DAGs, dbt models, Evidence dashboards, and a DuckDB data warehouse. Your objective is to create an agent exposed via a CLI to interact with the data platform. This CLI agent should be geared specifically towards ad-hoc questions and analysis for a Go-To-Market (GTM) team. Things like:
+This repo is a synthetic data platform containing mock GTM data — CRM records, sales call intelligence, marketing automation, and product analytics — along with Airflow DAGs, dbt models, Evidence dashboards, and a DuckDB data warehouse.
 
-- What's our win rate against CompetitorA vs CompetitorB?
-- Which lead sources have the highest conversion rate to closed-won?
-- Which deals are at risk right now and why?
-- What does a winning call pattern look like compared to losing deals?
-- How does product usage correlate with account expansion?
-- ... and other, more complex things!
+## Assignment
 
-To complete this, fork the repo and build a CLI agent where you can send questions like the ones above. We have no particular requirements around languages, model providers, methods, etc — instead, we want you to demonstrate how you think about these problems! While this repo is representative of a B2B SaaS company's data platform, you should aim to keep your implementation generic enough that you could plug in other "mini data platforms". See how much you can infer based on the code and warehouse metadata instead of providing explicit documentation about this data platform to the agent upfront.
+Build an agent that, given an account or prospect, pulls together relevant internal context — deal history, product usage, call intelligence, marketing engagement — and drafts a personalized outreach email. Try to discover the schema dynamically rather than hardcoding table and column names. No requirements around languages, model providers, or methods — we want to see how you think about these problems.
 
-To submit, send us a fork of your repo. You should modify / create a new README that outlines your approach and where you'd continue building things if you had more time. This should take no more than a few hours.
+To submit, send us a link to your fork with a README outlining your approach and where you'd continue building if you had more time. This should take no more than a few hours.
+
+We're looking forward to seeing your work!
 
 ## Quick Setup
 
