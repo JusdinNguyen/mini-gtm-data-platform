@@ -1,8 +1,8 @@
 # GTM Outreach Agent
 
-A simple Python agent that drafts personalized B2B outreach emails from the Mini GTM Data Platform DuckDB warehouse.
+This is a Python agent that drafts personalized B2B outreach emails using the Mini GTM Data Platform DuckDB warehouse.
 
-Given an account or prospect, the agent gathers internal GTM context from accounts, opportunities, calls, funnel activity, and product usage. It then drafts a short outreach email and prints the evidence used so the output can be checked.
+The goal of the agent is to take an account or prospect, pull together the most relevant GTM context, and turn that context into a short outreach email. It uses account data, opportunities, sales calls, funnel activity, and product usage. The agent also prints the evidence it used, so the email can be checked instead of treated like a black box.
 
 ## Quick start
 
@@ -80,9 +80,9 @@ Evidence used:
 
 ## Approach
 
-The repo already provides a DuckDB warehouse with raw, staging, and marts schemas. I used the `marts` layer as the source of truth because those tables are already cleaned, joined, and modeled for business analysis through dbt.
+The repo already provides a DuckDB warehouse with raw, staging, and marts schemas. I used the `marts` layer as the source of truth because those tables are already cleaned and modeled for GTM analysis.
 
-The agent uses these documented marts tables:
+The agent uses these marts tables:
 
 ```text
 marts.dim_accounts
@@ -92,27 +92,27 @@ marts.fct_funnel
 marts.fct_product_usage
 ```
 
-I intentionally hardcoded the table names because the repo README clearly documents these marts tables and their roles. Fully discovering table roles dynamically would add complexity without much payoff for a short take-home.
+I kept the table names fixed because the repo README already documents these marts and what they are used for. For a short take-home, that felt like the right tradeoff. Fully discovering table roles dynamically would make the project more complex without making the agent much better.
 
-For columns, the agent does use schema discovery. It reads `information_schema.columns`, then resolves the important column names before building queries. This keeps the code more flexible than fully hardcoding every table and column name while still keeping the implementation readable.
+For columns, the agent does use schema discovery. It reads from `information_schema.columns` and resolves the important column names before building queries. This keeps the code flexible while still being easy to follow.
 
-The flow is:
+The basic flow is:
 
 ```text
 1. Connect to DuckDB
 2. Inspect the marts schema
-3. Resolve important column names
+3. Resolve the columns the agent needs
 4. Find the account or prospect
-5. Gather opportunities, calls, funnel activity, and product usage
-6. Detect the relationship mode
+5. Pull context from opportunities, calls, funnel activity, and product usage
+6. Choose the outreach angle
 7. Build a short evidence list
-8. Draft the email from the evidence
-9. Print the email and supporting evidence
+8. Draft the email from that evidence
+9. Print the email and the supporting evidence
 ```
 
 ## Relationship modes
 
-The agent uses simple deterministic rules to decide the email angle.
+The agent uses a few simple rules to decide the email angle.
 
 `deal_progression`: used when the account has an open opportunity. The email focuses on moving the deal forward.
 
@@ -122,22 +122,22 @@ The agent uses simple deterministic rules to decide the email angle.
 
 ## Design choices
 
-I kept the default email drafting deterministic and local. There is no OpenAI API key required to run the project.
+I kept the email drafting deterministic and local by default. There is no OpenAI API key required to run the project.
 
-I chose this because the most important part of the assignment is retrieving the right internal context and grounding the email in that context. The evidence list is printed under the email so the reviewer can verify where the claims came from.
+I made that choice because the main challenge is not just generating an email. The more important part is finding the right internal context and grounding the email in that context. The evidence list makes the output easier to review and helps prevent unsupported claims.
 
 An LLM drafting step could be added later using the same evidence list as the prompt input.
 
 ## Tradeoffs and next steps
 
-With more time, I would continue building in these areas:
+With more time, I would keep building in these areas:
 
 - Add optional LLM drafting with the evidence list as the prompt input
-- Improve prospect-to-account matching for leads that do not map cleanly to `dim_accounts`
+- Improve prospect-to-account matching. Today, if a prospect has a company name but does not cleanly map to a full `dim_accounts` record, the agent can still draft from funnel evidence, but some account fields may appear as `unknown`.
 - Add semantic search over call transcripts or call summaries
 - Rank evidence by recency, deal stage, product usage strength, and sales urgency
-- Add factuality checks to make sure every email claim is supported by retrieved evidence
-- Add a sales rep approval workflow before sending emails
+- Add checks to make sure every email claim is supported by retrieved evidence
+- Add a sales rep review step before any email is sent
 
 ## Tested examples
 
