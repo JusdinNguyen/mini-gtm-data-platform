@@ -1,189 +1,158 @@
-# Mini Data Platform — GTM Edition
+# GTM Outreach Agent
 
-This repo is a synthetic data platform containing mock GTM data — CRM records, sales call intelligence, marketing automation, and product analytics — along with Airflow DAGs, dbt models, Evidence dashboards, and a DuckDB data warehouse.
+A simple Python agent that drafts personalized B2B outreach emails from the Mini GTM Data Platform DuckDB warehouse.
 
-## Assignment
+Given an account or prospect, the agent gathers internal GTM context from accounts, opportunities, calls, funnel activity, and product usage. It then drafts a short outreach email and prints the evidence used so the output can be checked.
 
-Build an agent that, given an account or prospect, pulls together relevant internal context — deal history, product usage, call intelligence, marketing engagement — and drafts a personalized outreach email. Try to discover the schema dynamically rather than hardcoding table and column names. No requirements around languages, model providers, or methods — we want to see how you think about these problems.
+## Quick start
 
-To submit, send us a link to your fork with a README outlining your approach and where you'd continue building if you had more time. This should take no more than a few hours.
+First, fork the original assignment repo:
 
-We're looking forward to seeing your work!
+```text
+https://github.com/astronomer/mini-gtm-data-platform
+```
 
-## Quick Setup
+This submission was built in my fork:
 
-Run the setup script to initialize everything:
+```text
+https://github.com/JusdinNguyen/mini-gtm-data-platform
+```
+
+Clone the fork and move into the repo:
+
+```bash
+git clone https://github.com/JusdinNguyen/mini-gtm-data-platform.git
+cd mini-gtm-data-platform
+```
+
+Run the project setup if the DuckDB warehouse has not been created yet:
 
 ```bash
 ./setup.sh
 ```
 
-This will:
-1. Generate synthetic GTM data (accounts, opportunities, stage history, contacts, contact roles, leads, calls, trackers, campaigns, activities, product users/events)
-2. Initialize Airflow and load data into DuckDB
-3. Run dbt transformations (staging → marts)
+This generates the synthetic GTM data, loads it into DuckDB, and runs the dbt transformations. After setup, the warehouse should exist at:
 
-Then view the dashboards:
+```text
+warehouse/data.duckdb
+```
+
+Install the agent dependency if needed:
 
 ```bash
-cd evidence
-npm install       # First time only
-npm run sources   # Build data sources
-npm run dev       # Start dev server
-# Open http://localhost:3000
+uv pip install -r agent/requirements.txt
 ```
 
----
-
-## Manual Setup (Advanced)
-
-<details>
-<summary>Click to expand manual setup steps</summary>
-
-### 1. Install dependencies
+Run the outreach agent with an account:
 
 ```bash
-uv sync
+uv run python agent/gtm_agent.py --account "Velocity Solutions" --show-schema
 ```
 
-### 2. Generate synthetic data
+Run the outreach agent with a prospect:
 
 ```bash
-uv run python scripts/generate_all.py
+uv run python agent/gtm_agent.py --prospect "john.garcia135@techflowinc.com"
 ```
 
-### 3. Initialize Airflow
+## Example output
 
-First, update `airflow/airflow.cfg` to use an absolute path for the database:
+```text
+Relationship mode: deal_progression
+
+Subject: Next step on Velocity Solutions
+
+Hi there,
+
+I saw active deal context for Velocity Solutions. Open opportunity 'Velocity Solutions - Platform Deal' is in Prospecting for $235,033; next step is Reference call.
+
+Would it be useful to compare notes on the open questions and align on the next practical step?
+
+Best,
+Your Name
+
+Evidence used:
+1. [marts.dim_accounts row=1] Velocity Solutions is a Mid-Market account in Education with $130,412 ARR.
+2. [marts.fct_opportunities row=2,671] Open opportunity 'Velocity Solutions - Platform Deal' is in Prospecting for $235,033; next step is Reference call.
+3. [marts.fct_product_usage row=1:2025-01-01] Latest product usage shows 1 active users, 12 events, 6 features used, and engagement tier Occasional.
+4. [marts.fct_calls row=4,563] On 2024-12-30, a QBR call had 0 buying-signal mentions, 1 pricing mentions, 3 risk mentions, and next steps mentioned: no.
+```
+
+## Approach
+
+The repo already provides a DuckDB warehouse with raw, staging, and marts schemas. I used the `marts` layer as the source of truth because those tables are already cleaned, joined, and modeled for business analysis through dbt.
+
+The agent uses these documented marts tables:
+
+```text
+marts.dim_accounts
+marts.fct_opportunities
+marts.fct_calls
+marts.fct_funnel
+marts.fct_product_usage
+```
+
+I intentionally hardcoded the table names because the repo README clearly documents these marts tables and their roles. Fully discovering table roles dynamically would add complexity without much payoff for a short take-home.
+
+For columns, the agent does use schema discovery. It reads `information_schema.columns`, then resolves the important column names before building queries. This keeps the code more flexible than fully hardcoding every table and column name while still keeping the implementation readable.
+
+The flow is:
+
+```text
+1. Connect to DuckDB
+2. Inspect the marts schema
+3. Resolve important column names
+4. Find the account or prospect
+5. Gather opportunities, calls, funnel activity, and product usage
+6. Detect the relationship mode
+7. Build a short evidence list
+8. Draft the email from the evidence
+9. Print the email and supporting evidence
+```
+
+## Relationship modes
+
+The agent uses simple deterministic rules to decide the email angle.
+
+`deal_progression`: used when the account has an open opportunity. The email focuses on moving the deal forward.
+
+`expansion`: used when the account has closed-won history or meaningful product usage. The email focuses on building on existing momentum.
+
+`cold_outreach`: used when there is no clear open deal or expansion signal. The email uses lighter funnel or marketing engagement context.
+
+## Design choices
+
+I kept the default email drafting deterministic and local. There is no OpenAI API key required to run the project.
+
+I chose this because the most important part of the assignment is retrieving the right internal context and grounding the email in that context. The evidence list is printed under the email so the reviewer can verify where the claims came from.
+
+An LLM drafting step could be added later using the same evidence list as the prompt input.
+
+## Tradeoffs and next steps
+
+With more time, I would continue building in these areas:
+
+- Add optional LLM drafting with the evidence list as the prompt input
+- Improve prospect-to-account matching for leads that do not map cleanly to `dim_accounts`
+- Add semantic search over call transcripts or call summaries
+- Rank evidence by recency, deal stage, product usage strength, and sales urgency
+- Add factuality checks to make sure every email claim is supported by retrieved evidence
+- Add a sales rep approval workflow before sending emails
+
+## Tested examples
+
+I tested the agent with:
 
 ```bash
-cd airflow
-# Update sql_alchemy_conn in airflow.cfg to:
-# sql_alchemy_conn = sqlite:////absolute/path/to/your/mini-data-platform-gtm/airflow/airflow.db
-
-export AIRFLOW_HOME=$(pwd)
-uv run airflow db migrate
+uv run python agent/gtm_agent.py --account "Velocity Solutions" --show-schema
 ```
-
-### 4. Run ingestion DAGs
 
 ```bash
-# From airflow/ directory
-export AIRFLOW_HOME=$(pwd)
-uv run python dags/ingest_accounts.py
-uv run python dags/ingest_opportunities.py
-uv run python dags/ingest_stage_history.py
-uv run python dags/ingest_contacts.py
-uv run python dags/ingest_contact_roles.py
-uv run python dags/ingest_leads.py
-uv run python dags/ingest_calls.py
-uv run python dags/ingest_call_trackers.py
-uv run python dags/ingest_campaigns.py
-uv run python dags/ingest_lead_activities.py
-uv run python dags/ingest_product_users.py
-uv run python dags/ingest_product_events.py
+uv run python agent/gtm_agent.py --account "Fusion Solutions"
 ```
-
-### 5. Run dbt transformations
 
 ```bash
-# From airflow/ directory
-export AIRFLOW_HOME=$(pwd)
-uv run python dags/run_dbt.py
-
-# Or run dbt directly
-cd ../dbt_project
-uv run dbt build --profiles-dir .
+uv run python agent/gtm_agent.py --prospect "john.garcia135@techflowinc.com"
 ```
 
-</details>
-
-## Project Structure
-
-```
-mini-data-platform-gtm/
-├── sources/
-│   └── postgres/             # All raw source data (CSV files)
-├── airflow/
-│   ├── dags/                 # Airflow DAGs for ingestion and transformation
-│   │   ├── ingest_*.py       # Load data from sources → raw schema
-│   │   ├── run_dbt.py        # Run dbt staging → marts pipeline
-│   │   └── build_evidence.py # Build Evidence dashboards
-│   └── utils/                # Shared utilities (warehouse.py)
-├── warehouse/                # DuckDB database (data.duckdb)
-├── dbt_project/              # dbt transformations
-│   └── models/
-│       ├── staging/          # Clean raw data (12 models)
-│       └── marts/            # Analytics-ready tables (6 models)
-├── evidence/                 # Evidence BI dashboards
-│   ├── pages/                # Dashboard pages (pipeline, deals, funnel, forecast, adoption)
-│   └── sources/              # SQL queries and DuckDB connection
-└── scripts/                  # Data generation scripts
-```
-
-## Data Pipeline
-
-### Raw Layer (`raw` schema)
-
-- Loaded by Airflow ingestion DAGs
-- 12 tables: accounts, opportunities, stage_history, contacts, contact_roles, leads, calls, call_trackers, campaigns, lead_activities, product_users, product_events
-
-### Staging Layer (`staging` schema)
-
-- Created by dbt
-- 12 views with data cleaning (fix negatives, cap impossible values, filter nulls, remove future timestamps, deduplicate)
-
-### Marts Layer (`marts` schema)
-
-- Created by dbt
-- 6 denormalized tables:
-  - `dim_accounts` — Accounts enriched with pipeline stats, contact counts, segment classification
-  - `dim_reps` — Sales rep dimension with win rate, pipeline, call activity metrics
-  - `fct_opportunities` — Opportunities joined with account, call stats, call intelligence, multi-threading, lead attribution
-  - `fct_calls` — Sales calls with opportunity/account context and tracker topic summaries
-  - `fct_funnel` — Lead-to-close funnel with marketing attribution and engagement metrics
-  - `fct_product_usage` — Account-level monthly product usage with feature adoption and engagement tiers
-
-## Data Volumes
-
-- **Raw**: ~130K total rows across 12 tables
-- **Staging**: Same as raw (views with cleaning)
-- **Marts**: ~1K dimension rows + ~40K fact rows
-- **Database Size**: ~10-15 MB (DuckDB)
-
-## Evidence Dashboards
-
-The project includes interactive dashboards built with Evidence:
-
-### Available Dashboards
-
-1. **Pipeline Overview** (`/`) — Total pipeline, stage distribution, segment/region breakdown, monthly trends
-2. **Deal Intelligence** (`/deals`) — Win/loss analysis, loss reasons, competitive intel from call trackers, call insights
-3. **Full Funnel** (`/funnel`) — Lead-to-close conversion rates, channel ROI, marketing attribution, engagement analysis
-4. **Forecast** (`/forecast`) — Forecast categories, weighted pipeline, rep commit analysis, quarterly trends
-5. **Product Usage** (`/adoption`) — Product usage analytics, feature adoption, engagement tiers, usage vs revenue
-
-### Running Evidence
-
-```bash
-cd evidence
-npm install       # First time only
-npm run sources   # Build data sources
-npm run dev       # Start dev server
-```
-
-Then open http://localhost:3000 to view dashboards.
-
-**Note**: Evidence connects to the DuckDB warehouse at `../warehouse/data.duckdb` and queries the `marts` and `staging` schemas through pass-through SQL files in `evidence/sources/warehouse/`.
-
-### Building Evidence (Static Site)
-
-```bash
-# Using Airflow DAG
-cd airflow
-uv run python dags/build_evidence.py
-
-# Or build directly
-cd evidence
-npm run build
-```
+These tests confirmed that the agent works with both account and prospect input, retrieves GTM context from the warehouse, drafts an email, and prints the supporting evidence.
