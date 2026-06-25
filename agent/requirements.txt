@@ -1,0 +1,7 @@
+```txt
+
+duckdb
+
+openai
+
+```
